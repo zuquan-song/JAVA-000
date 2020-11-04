@@ -1,5 +1,6 @@
 package io.github.kimmking.gateway.outbound.okhttp;
 
+import io.github.kimmking.gateway.helper.BackendInfo;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -16,15 +17,19 @@ import org.apache.http.util.EntityUtils;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 import static io.netty.handler.codec.http.HttpResponseStatus.NO_CONTENT;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
+
+import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
+
 
 public class OkhttpOutboundHandler {
-    private final String backendUrl;
+    private final List<String> backendUrls;
     private final ExecutorService proxyService;
     private final CloseableHttpAsyncClient client;
 
-    public OkhttpOutboundHandler(String backendUrl) {
-        this.backendUrl = backendUrl.endsWith("/") ? backendUrl.substring(0, backendUrl.length() - 1) : backendUrl;
+    public OkhttpOutboundHandler(ArrayList<BackendInfo> backendUrls) {
+        this.backendUrls = backendUrls.stream().map((BackendInfo::transferToUrl)).collect(Collectors.toList());
         final int cores = Runtime.getRuntime().availableProcessors() * 2;
         final long keepAliveTime = 1000;
         final int queueSize = 2048;
@@ -47,13 +52,22 @@ public class OkhttpOutboundHandler {
     }
 
     public void handle(final FullHttpRequest fullRequest, final ChannelHandlerContext ctx) {
-        final String url = this.backendUrl + fullRequest.uri();
+        Random random = new Random();
+        int idx = random.nextInt() % this.backendUrls.size();
+        final String url = backendUrls.get(idx) + fullRequest.uri();
+
         this.proxyService.submit(() -> fetchGet(fullRequest, ctx, url));
     }
 
     private void fetchGet(final FullHttpRequest inbound, final ChannelHandlerContext ctx, final String url) {
         final HttpGet httpGet = new HttpGet(url);
         httpGet.setHeader(HTTP.CONN_DIRECTIVE, HTTP.CONN_KEEP_ALIVE);
+        Iterator<Map.Entry<String, String>> iter = inbound.headers().iteratorAsString();
+        while (iter.hasNext()) {
+            Map.Entry<String, String> entry = iter.next();
+            httpGet.setHeader(entry.getKey(), entry.getValue());
+        }
+
         this.client.execute(httpGet, new FutureCallback<HttpResponse>() {
             @Override
             public void completed(final HttpResponse httpResponse) {

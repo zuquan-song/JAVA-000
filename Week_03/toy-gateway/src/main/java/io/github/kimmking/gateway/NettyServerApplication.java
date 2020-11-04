@@ -9,7 +9,7 @@ public class NettyServerApplication {
     public final static String GATEWAY_VERSION = "1.0.0";
     
     public static void main(String[] args) {
-        String proxyServer = System.getProperty("proxyServer","http://localhost:8088");
+//        String proxyServer = System.getProperty("proxyServer","http://localhost:8088");
         String proxyPort = System.getProperty("proxyPort","8888");
         
           //  http://localhost:8888/api/hello  ==> gateway API
@@ -17,8 +17,9 @@ public class NettyServerApplication {
     
         int port = Integer.parseInt(proxyPort);
         System.out.println(GATEWAY_NAME + " " + GATEWAY_VERSION +" starting...");
-        HttpInboundServer server = new HttpInboundServer(port, proxyServer);
-        System.out.println(GATEWAY_NAME + " " + GATEWAY_VERSION +" started at http://localhost:" + port + " for server:" + proxyServer);
+
+        HttpInboundServer server = new HttpInboundServer(port, "localhost", 8088);
+        System.out.println(GATEWAY_NAME + " " + GATEWAY_VERSION +" started at http://localhost:" + port + " for server: localhost:8088" );
         try {
             server.run();
         }catch (Exception ex){
